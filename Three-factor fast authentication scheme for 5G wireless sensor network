@@ -1,0 +1,174 @@
+role user (U, S: agent, Kus, SKij: symmetric_key, Ks: public_key, H, H1, H2, H6, H7, H14, H16: hash_func, SND, RCV: channel (dy))
+played_by U def=
+
+  local State: nat,
+        IDi, IDinew, IDj, Nj, PWi, Bi, E, Ej, Xj, V, N, N1, BBi, W, Yij, Tu, Ts, T1, T2, A, As, B, Bs, SKijNew: text, K, Q, Ay, By: message
+
+  init State := 0
+
+  transition
+
+% Registration phase
+
+	1.  State = 0 /\ RCV(start) =|>
+		   State':= 1
+		   %/\ Enter IDi, PWi & Bi
+		   /\ E' := new()
+		   /\ BBi' := H(PWi.Bi)
+		   /\ W' := H(H(PWi.E').xor(h(xor(IDi,IDj)),E'))
+		   /\ SND({IDi.W'.BBi'}_Kus)
+		   /\ secret(E',g1,{U})
+		   /\ secret(IDi,g2,{U,S})
+		   /\ secret(PWi,g3,{U})
+		   /\ secret(Bi,g4,{U})
+
+	2.  State = 1 /\ RCV({IDi.Nj.{H(Xj').IDj.IDi.H(H(PWi.E).xor(h(xor(IDi,IDj)),E)).H(PWi.Bi)}_Xj'}_Kus) =|>
+		   State':= 2
+		   /\ Ej' := xor(E,({H(Xj).IDj.IDi.W.BBi}_Xj))
+		   %/\ Store E, IDi, PWi & Bi in the smart card
+		   %/\ Store Ej', IDj, & Nj in the USB
+
+% Login and initial authentication phase
+
+	3.  State = 0 /\ RCV(start) =|>
+		   State':= 1
+		   %/\ Insert smart card
+		   %/\ Enter PWi* & Bi*
+		   /\ V' := new()
+		   %/\ Suppose b = 3
+		   /\ N' := H(H(H(V')))
+		   /\ BBi' := H(PWi.Bi)
+		   /\ W' := H(H(PWi.E).xor(h(xor(IDi,IDj)),E))
+		   /\ Yij' := xor(E,Ej)
+		   /\ Tu' := new()
+		   /\ A' := xor(xor(BBi',W'),Tu')
+		   /\ K' := {IDi.IDj.Yij'.N'.A'.Tu'}_Ks
+		   /\ SND(K')
+		   /\ witness(U,S,u_s_v,V')
+		   /\ witness(U,S,u_s_tu,Tu')
+		   /\ secret(IDi,g2,{U,S})
+		   /\ secret(PWi,g3,{U})
+		   /\ secret(Bi,g4,{U})
+
+	4.  State = 1 /\ RCV(({B'.H(Yij.IDi.H(Xj)).H6(H(H(Yij.IDi.H(Xj)).Xj.As')).H14(H(H(Yij.IDi.H(Xj)).Xj.Bs')).Ts'}_SKij').T1'.T2') =|>
+		   State':= 2
+		   /\ SKij' := H(xor(N,Yij))
+		   %/\ Confirm Ts'
+		   %/\ Confirm B
+		   %/\ Store IDinew, ATa, ATb in the smart card
+		   %/\ Store T1, T2 in the USB
+		   /\ request(S,U,s_u_ts,Ts')
+
+% Fast authentication phase
+
+ 	5. State = 0 /\ RCV(start) =|>
+		   State':= 1
+		   %/\ Enter IDinew, PWi & Bi
+		   %/\ Suppose Tlogin = 8
+		   /\ Ay' := H(H1(H6(H(H(Yij.IDi.H(Xj)).Xj.As)))).H(H2(H14(H(H(Yij.IDi.H(Xj)).Xj.Bs))))
+		   /\ SND(Ay')
+
+	6. State = 1 /\ RCV({H(xor(Ay',IDinew))}_SKij) =|>
+		   State':= 2
+		   %/\ Confirm By'
+end role
+
+
+role server (U, S: agent, Kus, SKij: symmetric_key, Ks: public_key, H, H1, H2, H6, H7, H14, H16: hash_func, SND, RCV: channel (dy))
+played_by S def=
+
+  local State: nat,
+        IDi, IDinew, IDj, Nj, PWi, Bi, E, Ej, X, Y, Xj, V, N, N1, BBi, W, Yij, Tu, Ts, T1, T2, A, As, B, Bs, ATa, ATb, SKijNew: text, K, Q, Ay, By: message
+
+  init State := 0
+
+  transition
+
+% Registration phase
+
+	1. State = 0 /\ RCV({IDi.H(H(PWi.E').xor(h(xor(IDi,IDj)),E')).H(PWi.Bi)}_Kus) =|>
+		   State':= 1
+		   /\ Yij' := {H(Xj).IDj.IDi.H(H(PWi.E').xor(h(xor(IDi,IDj)),E')).H(PWi.Bi)}_Xj
+		   %/\ Store IDj
+		   /\ SND({IDi.Nj.Yij'}_Kus)
+		   /\ secret(Xj,g5,{S})
+
+% Login and initial authentication phase
+
+	2. State = 0 /\ RCV({IDi.IDj.Yij'.H(H(H(V'))).A'.Tu'}_Ks) =|>
+		   State':= 1
+		   %/\ Confirm Tu'
+		   %/\ Use Xj to decrypt Yij
+		   %/\ Confirm H(Xj), IDsj & IDi
+		   /\ A' := xor(xor(BBi.W).Tu')
+		   %/\ Confirm A
+		   /\ Ts' := new()
+		   /\ B' := xor(H(H(H(H(V')))),Ts')
+		   /\ IDinew' := H(Yij.IDi.H(Xj))
+		   /\ T1' := new()   /\ T2' := new()
+		   /\ As' := new()   /\ Bs' := new()
+		   %/\ Z =24, suppose T1=7, T2=10
+		   /\ ATa' := H6(H(IDinew'.Xj.As'))
+		   /\ ATb' := H14(H(IDinew'.Xj.Bs'))
+		   /\ SKij' := H(xor(H(H(H(V'))),Yij'))
+		   /\ Q':= {B'.IDinew'.ATa'.ATb'.Ts'}_SKij'
+		   /\ SND (Q'.T1'.T2')
+		   /\ witness(S,U,s_u_ts,Ts')
+		   /\ secret(As',g6,{S})
+		   /\ secret(Bs',g7,{S})
+		   /\ request(U,S,u_s_v,V')
+		   /\ request(U,S,u_s_tu,Tu')
+
+% Fast authentication phase
+
+	3. State = 0 /\ RCV(H(H1(H6(H(H(Yij.IDi.H(Xj)).Xj.As')))).H(H2(H14(H(H(Yij.IDi.H(Xj)).Xj.Bs'))))) =|>
+		   State':= 1
+		   /\ X' := H(IDinew.Xj.As)
+		   /\ Y' := H(IDinew.Xj.Bs)
+		   /\ Ay' := H(H7(X').H16(Y'))
+		   %/\ Confirm Ay
+		   /\ By' := {H(xor(Ay',IDinew))}_SKij
+		   /\ SND(By')
+end role
+
+role session (U, S: agent, Kus, SKij: symmetric_key, Ks: public_key, H, H1, H2, H6, H7, H14, H16: hash_func) def=
+
+  local SU, RU, SS, RS: channel (dy)
+
+  composition
+
+	user (U,S,Kus,SKij,Ks,H,H1,H2,H6,H7,H14,H16,SU,RU)
+          /\ server (U,S,Kus,SKij,Ks,H,H1,H2,H6,H7,H14,H16,SS,RS)
+
+end role
+
+
+role environment() def=
+
+    const u, s: agent,
+	  kus, skij, kui: symmetric_key,
+	  ks, ki: public_key,
+	  h, h1, h2, h6, h7, h14, h16: hash_func,
+	  u_s_v, u_s_tu, s_u_ts, g1, g2, g3, g4, g5, g6, g7: protocol_id
+
+    intruder_knowledge = {u,s,ks,ki,inv(ki)}
+
+    composition
+
+	session(u,s,kus,skij,ks,h,h1,h2,h6,h7,h14,h16)
+	/\ session(u,i,kui,kui,ks,h,h1,h2,h6,h7,h14,h16)
+	/\ session(i,s,kui,kui,ks,h,h1,h2,h6,h7,h14,h16)
+
+end role
+
+
+goal
+
+  secrecy_of g1, g2, g3, g4, g5, g6, g7
+  authentication_on u_s_v, u_s_tu, s_u_ts
+
+end goal
+
+
+
+environment()
