@@ -1,0 +1,178 @@
+role user (U, S: agent, Kus, SKij, GkiAT: symmetric_key, Ks: public_key, H, H1, H2, H4, H5, H6, H8, H14, H15, Sub, Add, Mul, Div: hash_func, SND, RCV: channel (dy))
+played_by U def=
+
+local State: nat,
+IDi, IDinew, IDj, Nj, PWi, Bi, Gki, GkiATNew, E, Ej, Xj, V, M, N, N1, Hi, BBi, W, Yij, Tu, Ts, T1, Ti1, T2, Ti2, A, As, B, Bs, ATia, ATib, SKijNew: text, K, Q, Q1, C1, C2, C3: message
+
+init State := 0
+
+transition
+
+% Registration procedure
+
+1.  State = 0 /\ RCV(start) =|>
+State':= 1
+%/\ Enter IDi, PWi & Bi
+/\ E' := new()
+/\ BBi' := H(PWi.Bi)
+/\ W' := H(H(PWi.E').xor(h(xor(IDi,IDj)),E'))
+/\ SND({IDi.W'.BBi'}_Kus)
+/\ secret(E',g1,{U}) /\ secret(IDi,g2,{U,S}) /\ secret(PWi,g3,{U}) /\ secret(Bi,g4,{U})
+2.  State = 1 /\ RCV({IDi.Nj.({H(Xj).IDj.IDi.H(H(PWi.E').xor(h(xor(IDi,IDj)),E')).H(PWi.Bi)}_Xj)}_Kus) =|>
+State':= 2
+/\ Ej' := xor(E,({H(Xj).IDj.IDi.W.BBi}_Xj))
+%/\ Store E, IDi, PWi and Bi in the smart card
+%/\ Store Ej, IDj and Nj in the USB
+
+% Login and authentication procedure
+
+3.  State = 0 /\ RCV(start) =|>
+State':= 1
+%/\ Insert smart card
+%/\ Enter PWi* & Bi*
+/\ V' := new()
+%/\ Suppose b = 3
+/\ N' := H(H(H(V')))
+/\ BBi' := H(PWi.Bi)
+/\ W' := H(H(PWi.E).xor(h(xor(IDi,IDj)),E))
+/\ Tu' := new()
+/\ A' := xor(xor(BBi',W'),Tu')
+/\ Yij' := xor(E,Ej)
+/\ K' := {IDj.IDi.Yij'.N'.A'.Tu'}_Ks
+/\ SND(K')
+/\ witness(U,S,u_s_v,V')
+/\ witness(U,S,u_s_tu,Tu')
+/\ secret(IDi,g2,{U,S})
+/\ secret(PWi,g3,{U})
+/\ secret(Bi,g4,{U})
+4.  State = 1 /\ RCV(({xor(H(H(H(H(V')))),Ts').H(Yij.IDi.H(Xj)).Ts'}_SKij').C1'.C2'.C3') =|>
+State':= 2
+/\ SKij' := H(xor(N,Yij))
+%/\ Confirm Ts'
+/\ B' := xor(H(H(H(H(V')))),Ts')
+%/\ Confirm B
+%/\ Store IDinew in the smart card
+/\ Hi' := H5(SKij'.Ts')
+/\ Gki' := Sub(H4(SKij'.Ts').Add(Mul(Hi'.C1').Mul(Hi'.C2').Mul(Hi'.C3')))
+%/\ Obtain ATia, ATib, Ti1 and Ti2 from Cki'
+/\ GkiAT' := H(H1(H6(H(Xj.As))).H2(H14(H(Xj.Bs))))
+/\ request(S,U,s_u_ts,Ts')
+
+% Dynamic key derivation procedure
+
+5. State = 0 /\ RCV({H6(H(Xj.As.M')).H14(H(Xj.Bs.M'))}_GkiAT') =|>
+State':= 1
+/\ GkiAT' := H(H2(H6(H(Xj.As))).H1(H14(H(Xj.Bs))))
+%/\ Use CkiAT to decrypt Q1 and obtains ATia' = H6(H(Xj.As.M')) and ATib' = H14(H(Xj.Bs.M'))
+/\ GkiATNew' := H(H2(H6(H(Xj.As.M'))).H1(H14(H(Xj.Bs.M'))))
+/\ request(S,U,s_u_m,M')
+
+end role
+
+
+role server (U, S: agent, Kus, SKij, GkiAT: symmetric_key, Ks: public_key, H, H1, H2, H4, H5, H6, H8, H14, H15, Sub, Add, Mul, Div: hash_func, SND, RCV: channel (dy))
+played_by S def=
+
+local State: nat,
+IDi, IDinew, IDj, Nj, PWi, Bi, Gki, GkiATNew, E, Ej, X, Y, Xj, V, M, N, N1, Hi, BBi, W, Yij, Tu, Ts, T1, Ti1, T2, Ti2, A, As, B, Bs, ATia, ATib, SKijNew: text, K, Q, Q1, C1, C2, C3: message
+
+init State := 0
+
+transition
+
+% Registration procedure
+
+1. State = 0 /\ RCV({IDi.H(H(PWi.E').xor(h(xor(IDi,IDj)),E')).H(PWi.Bi)}_Kus) =|>
+State':= 1
+/\ Yij' := {H(Xj).IDj.IDi.H(H(PWi.E').xor(h(xor(IDi,IDj)),E')).H(PWi.Bi)}_Xj
+%/\ Store IDj
+/\ SND({Nj.Yij'}_Kus)
+/\ secret(Xj,g5,{S})
+
+% Login and authentication procedure
+
+2. State = 0 /\ RCV({IDj.IDi.{H(Xj).IDj.IDi.H(H(PWi.E).xor(h(xor(IDi,IDj)),E)).H(PWi.Bi)}_Xj.H(H(H(V'))).xor(xor(H(PWi.Bi),H(H(PWi.E).xor(h(xor(IDi,IDj)),E))),Tu').Tu'}_Ks) =|>
+State':= 1
+%/\ Confirm Tu'
+%/\ Use Xj to decrypt Yij
+%/\ Confirm H(Xj), IDsj & IDi
+/\ A' := xor(xor(BBi,W),Tu')
+%/\ Confirm A
+/\ Ts' := new()
+/\ B' := xor(H(H(H(H(V')))),Ts')
+/\ IDinew' := H(Yij.IDi.H(Xj))
+/\ SKij' := H(xor(H(H(H(V'))),Yij))
+/\ As' := new() /\ Bs' := new()
+/\ Ti1' := new() /\ Ti2' := new()
+%/\ Z =24, suppose Ti1=7, Ti2=10
+/\ ATia' := H6(H(Xj.As'))
+/\ ATib' := H14(H(Xj.Bs'))
+/\ Gki' := (ATia'.ATib'.Ti1'.Ti2')
+/\ Hi' := H5(SKij'.Ts')
+%/\ Suppose there are three users in this communication sesstion.
+/\ C1' := Div(Sub(H4(SKij'.Ts').Add(Gki'.Mul(Hi'.C2').Mul(Hi'.C3'))).Hi')
+/\ C2' := Div(Sub(H4(SKij'.Ts').Add(Gki'.Mul(Hi'.C1').Mul(Hi'.C3'))).Hi')
+/\ C3' := Div(Sub(H4(SKij'.Ts').Add(Gki'.Mul(Hi'.C1').Mul(Hi'.C2'))).Hi')
+/\ Q':= {B'.IDinew'.Ts'}_SKij'
+/\ SND (Q'.C1'.C2'.C3')
+/\ secret(As',g6,{S}) /\ secret(Bs',g7,{S}) /\ secret(Ti1',g8,{U,S}) /\ secret(Ti2',g9,{U,S})
+/\ witness(S,U,s_u_ts,Ts')
+/\ request(U,S,u_s_v,V')
+/\ request(U,S,u_s_tu,Tu')
+
+% Dynamic key derivation procedure
+
+3.  State = 0 /\ RCV(start) =|>
+State':= 1
+/\ M' := new()
+/\ ATia' := H6(H(Xj.As.M'))
+/\ ATib' := H14(H(Xj.Bs.M'))
+/\ X' := H(Xj.As)
+/\ Y' := H(Xj.Bs)
+%/\ Suppose current T = 9
+/\ GkiAT' := H(H8(X').H15(Y'))
+/\ Q1' := {ATia'.ATib'}_GkiAT'
+/\ SND (Q1')
+/\ witness(S,U,s_u_m,M')
+/\ secret(ATia',g10,{U,S})
+/\ secret(ATib',g11,{U,S})
+
+end role
+
+role session (U, S: agent, Kus, SKij, GkiAT: symmetric_key, Ks: public_key, H, H1, H2, H4, H5, H6, H8, H14, H15, Sub, Add, Mul, Div: hash_func) def=
+
+local SU, RU, SS, RS: channel (dy)
+
+composition
+
+user (U,S,Kus,SKij,GkiAT,Ks,H,H1,H2,H4,H5,H6,H8,H14,H15,Sub,Add,Mul,Div,SU,RU)
+/\ server (U,S,Kus,SKij,GkiAT,Ks,H,H1,H2,H4,H5,H6,H8,H14,H15,Sub,Add,Mul,Div,SS,RS)
+
+end role
+
+role environment() def=
+
+const u, s: agent,
+kus, skij, gkiat, kui: symmetric_key,
+ks, ki: public_key,
+h, h1, h2, h4, h5, h6, h8, h14, h15, sub, add, mul, div: hash_func,
+g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, u_s_v, u_s_tu, s_u_ts, s_u_m: protocol_id
+
+intruder_knowledge = {u,s,ks,ki,inv(ki)}
+
+composition
+
+session(u,s,kus,skij,gkiat,ks,h,h1,h2,h4,h5,h6,h8,h14,h15,sub,add,mul,div)
+/\ session(u,i,kui,kui,kui,ks,h,h1,h2,h4,h5,h6,h8,h14,h15,sub,add,mul,div)
+/\ session(i,s,kui,kui,kui,ks,h,h1,h2,h4,h5,h6,h8,h14,h15,sub,add,mul,div)
+
+end role
+
+goal
+
+secrecy_of g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11
+authentication_on u_s_v, u_s_tu, s_u_ts, s_u_m
+
+end goal
+
+environment()
