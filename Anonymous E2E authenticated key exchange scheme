@@ -1,0 +1,152 @@
+role user (U, S, F: agent, Kus, Rus, Kas: symmetric_key, Ks: public_key, H, Mul: hash_func, SND, RCV: channel (dy))
+played_by U def=
+
+  local State: nat,
+       SPWim, SAim, Ri, SIDim, Umi, Bmi, Tim, Nfp, Nfp1, Qp, Cim1, G, B1mi, Aim, Wmi, Ymi, Dm, Kmi, B2mi, Dmi, Rim, Uim, Ynj, IDsm, Cim2, Kua, Xm, Bpm, A: text
+
+  init State := 0
+
+  transition
+
+% Registration phase
+
+	1.  State = 0 /\ RCV(start) =|>
+		   State':= 1
+		   %/\ Enter SIDim to smart card
+		   /\ SPWim' := new()
+		   /\ SAim' := xor(H(SPWim'),H(Ri.SIDim))
+		   /\ SND({SIDim.SAim'}_Kus)
+		   /\ secret(SIDim,g1,{U,S})
+		   /\ secret(SAim',g2,{U,S})
+		   /\ secret(SPWim',g3,{U})
+
+	2.  State = 1 /\ RCV({xor(Umi',xor(H(SPWim'),H(Ri.SIDim)))}_Kus) =|>
+		   State':= 2
+		   /\ Bmi' := xor(Umi',xor(H(SPWim'),H(Ri.SIDim)))
+		   %/\ Store Bmi in flash storage %/\ Store SAim in smart card
+
+% Mutual authentication and key exchange phase
+
+	3.  State = 0 /\ RCV(start) =|>
+		   State':= 1
+		   %/\ Enter IDUi, PWUi to smart card %/\ Smart card verify legitimacy of user %/\ Enter SIDim to smart card
+		   /\ Uim' := xor(Bmi,SAim)
+		   /\ Aim' := new()
+		   /\ Tim' := new()
+		   /\ Cim1' := {xor((Uim'.SIDim),Tim')}_Ks
+		   /\ SND(Cim1'.Tim')
+		   /\ witness(U,S,u_s_tim,Tim')
+
+	4.  State = 1 /\ RCV(({Mul(B1mi'.G).Mul(B1mi'.Ynj).H(Ymi'.Kmi'.SIDim.IDsm).Nfp'.Nfp1'}_Rus).Qp) =|>
+		   State':= 2
+		   /\ Kua' := Mul(Nfp'.Aim.Mul(B1mi'.Ynj))
+		   /\ request(S,U,s_u_b1mi,B1mi')
+
+end role
+
+role server (U, S, F: agent, Kus, Rus, Kas: symmetric_key, Ks: public_key, H, Mul: hash_func, SND, RCV: channel (dy))
+played_by S def=
+
+  local State: nat,
+       SPWim, SAim, Ri, SIDim, Umi, Bmi, Tim, Nfp, Nfp1, Qp, Cim1, G, B1mi, Aim, Wmi, Ymi, Dm, Kmi, B2mi, Dmi, Rim, Uim, Ynj, IDsm, Cim2, Kua, Xm, Bpm, A: text
+
+  init State := 0
+
+  transition
+
+% Registration phase
+
+	1. State = 0 /\ RCV({SIDim.xor(H(SPWim'),H(Ri.SIDim))}_Kus) =|>
+		   State':= 1
+		   /\ Umi' := H(SIDim.Xm)
+		   /\ Bmi' := xor(Umi',xor(H(SPWim'),H(Ri.SIDim)))
+		   /\ SND({Bmi'}_Kus)
+		   /\ secret(Bmi',g4,{U,S})
+
+% Mutual authentication and key exchange phase
+
+	2.  State = 0 /\ RCV(xor(({xor((Uim'.SIDim),Tim')}_Ks),Nfp').({xor((Uim'.SIDim),Tim')}_Ks).({Qp'.Nfp1'}_Kas)) =|>
+		   State':= 1
+		   /\ Cim1' := xor(xor(({xor((Uim'.SIDim),Tim')}_Ks),Nfp'),Nfp')
+		   /\ B1mi' := new()
+		   /\ Wmi' := Mul(B1mi'.G)
+		   /\ Ymi' := Mul(Nfp'.Rim.B1mi')
+		   %/\ Dm = Signature of Sm with Ymi'
+		   %/\ Send Dm to server Sn %/\ Receive Dn' from Sn, verify identity of Sn, and open Dn'
+		   /\ Kmi' := Mul(B1mi'.Ynj)
+		   /\ B2mi' := H(Ymi'.Kmi'.SIDim.IDsm)
+		   /\ Dmi' := {Wmi'.Kmi'.B2mi'.Nfp'.Nfp1'}_Rus
+		   /\ SND({{Wmi'.Kmi'.B2mi'.Nfp'.Nfp1'}_Rus}_Kas)
+		   /\ request(U,S,u_s_tim,Tim')
+		   /\ witness(S,U,s_u_b1mi,B1mi')
+
+end role
+
+role foreign (U, S, F: agent, Kus, Rus, Kas: symmetric_key, Ks: public_key, H, Mul: hash_func, SND, RCV: channel (dy))
+played_by F def=
+
+  local State: nat,
+       SPWim, SAim, Ri, SIDim, Umi, Bmi, Tim, Nfp, Nfp1, Qp, Cim1, G, B1mi, Aim, Wmi, Ymi, Dm, Kmi, B2mi, Dmi, Rim, Uim, Ynj, IDsm, Cim2, Kua, Xm, Bpm, A: text
+
+  init State := 0
+
+  transition
+
+% Mutual authentication and key exchange phase
+
+	1. State = 0 /\ RCV(({xor((Uim'.SIDim),Tim')}_Ks).Tim') =|>
+		   State':= 1
+		   /\ Nfp' := new()
+		   /\ Nfp1' := new()
+		   /\ Qp' := xor(Nfp',Nfp1')
+		   /\ Bpm' := {Qp'.Nfp1'}_Kas
+		   /\ Cim2' := xor(({xor((Uim'.SIDim),Tim')}_Ks),Nfp')
+		   /\ SND(xor(({xor((Uim'.SIDim),Tim')}_Ks),Nfp').({xor((Uim'.SIDim),Tim')}_Ks).Bpm')
+		   /\ secret(Nfp',g5,{U,S,F})
+		   /\ secret(Nfp1',g6,{U,S,F})
+
+	2. State = 1 /\ RCV({{Mul(B1mi'.G).Mul(B1mi'.Ynj).H(Mul(Nfp'.Rim.B1mi').Mul(B1mi'.Ynj).SIDim.IDsm).Nfp'.Nfp1'}_Rus}_Kas) =|>
+		   State':= 2
+		   /\ SND(({Mul(B1mi'.G).Mul(B1mi'.Ynj).H(Mul(Nfp'.Rim.B1mi').Mul(B1mi'.Ynj).SIDim.IDsm).Nfp'.Nfp1'}_Rus).Qp)
+
+end role
+
+role session (U, S, F: agent, Kus, Rus, Kas: symmetric_key, Ks: public_key, H, Mul: hash_func) def=
+
+  local SU, RU, SS, RS, SF, RF: channel (dy)
+
+  composition
+
+	user (U,S,F,Kus,Rus,Kas,Ks,H,Mul,SU,RU)
+          /\ server (U,S,F,Kus,Rus,Kas,Ks,H,Mul,SS,RS)
+         /\ foreign (U,S,F,Kus,Rus,Kas,Ks,H,Mul,SF,RF)
+
+end role
+
+role environment() def=
+
+    const u, s, f: agent,
+	  kus, rus, kas, kui: symmetric_key,
+	  ks, ki: public_key,
+	  h, mul: hash_func,
+	  u_s_tim, s_u_b1mi, g1, g2, g3, g4, g5, g6: protocol_id
+
+    intruder_knowledge = {u,s,f,ks,ki,inv(ki)}
+
+    composition
+
+	   session(u,s,f,kus,rus,kas,ks,h,mul)
+	/\ session(i,s,f,kui,kui,kui,ks,h,mul)
+	/\ session(u,i,f,kui,kui,kui,ks,h,mul)
+	/\ session(u,s,i,kui,kui,kui,ks,h,mul)
+
+end role
+
+goal
+
+  secrecy_of g1, g2, g3, g4, g5, g6
+  authentication_on u_s_tim, s_u_b1mi
+
+end goal
+
+environment()
