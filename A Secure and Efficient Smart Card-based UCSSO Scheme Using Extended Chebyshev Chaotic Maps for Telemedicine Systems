@@ -1,0 +1,129 @@
+role user (U, S: agent, Kus: symmetric_key, T, H: hash_func, SND, RCV: channel (dy))
+played_by U def=
+
+local State: nat,
+IDi, SIDj, PWi, X, Yi, Ai, Aii, Bj, Ui, Uj, Bi, Ci, Bii, Bjj, Ki, Kij, Ri, Pi, Mi, Sj, Wj, MacSj, MacUi, Xsj: text
+
+init State := 0
+%/\ Suppose T(.) is a Chebyshev polynomial, and p & Ni are known to U & S
+
+transition
+
+% Registration phase
+1.  State = 0 /\ RCV(start) =|>
+State':= 1
+/\ IDi' := new()
+/\ SIDj' := new()
+/\ PWi' := new()
+/\ Yi' := new()
+% Suppose T(.) is a Chebyshev polynomial
+/\ Ai' := T(Yi'.X)
+/\ Aii' := xor(({H(PWi')}_Ai'),({H(Yi'.SIDj')}_Ai'))
+/\ SND({IDi'.Aii'}_Kus)
+/\ secret(IDi',g1,{U,S}) /\ secret(Ai',g2,{U,S}) /\ secret(PWi',g3,{U})
+2.  State = 1 /\ RCV({xor(Ui',xor(({H(PWi')}_Ai'),({H(Yi'.SIDj')}_Ai'))).xor(Uj',xor(({H(PWi')}_Ai'),({H(Yi'.SIDj')}_Ai')))}_Kus) =|>
+State':= 2
+%/\ Store Bii and Bjj
+
+% Mutual authentication phase
+%/\ Input IDi, SIDj, PWi, Bii and Bjj into smart card
+%/\ Smart card checks PWi
+/\ Ui' := xor(Bii,Aii)
+/\ Ki' := xor(Aii,({H(Yi)}_Ai))
+/\ Ri' := xor(Bjj,({H(Yi)}_Ai))
+/\ Pi' := new()
+/\ Mi' := T(Yi.Pi')
+/\ Bi' := {Mi'}_Ui'
+/\ Ci' := {IDi.Bi'.Pi'}_Ki'
+/\ SND(Ri'.Ci')
+/\ witness(U,S,u_s_pi,Pi')
+3.  State = 2 /\ RCV(({H(SIDj.IDi.Mi')}_Kij').T(Sj'.Pi')) =|>
+State':= 3
+/\ Kij' := H(Yi.T(Sj'.Pi'))
+%/\ Confirm MacSj =? {H(SIDj.IDi.Mi)}_Kij
+/\ MacUi' := {H(IDi.SIDj.T(Sj'.Pi'))}_Kij'
+/\ SND(MacUi')
+/\ request(S,U,s_u_sj,Sj')
+
+end role
+
+
+role server (U, S: agent, Kus: symmetric_key, T, H: hash_func, SND, RCV: channel (dy))
+played_by S def=
+
+local State: nat,
+IDi, SIDj, PWi, X, Yi, Ai, Aii, Bj, Ui, Uj, Bi, Ci, Bii, Bjj, Ki, Kij, Ri, Pi, Mi, Sj, Wj, MacSj, MacUi, Xsj: text
+
+init State := 0
+%/\ Suppose T(.) is a Chebyshev polynomial, and p & Ni are known to U &S
+
+transition
+
+% Registration phase
+1. State = 0 /\ RCV({IDi'.xor(({H(PWi')}_Ai'),({H(Yi'.SIDj')}_Ai'))}_Kus) =|>
+State':= 1
+/\ Bj' := T(Xsj.X)
+/\ Ui' := {H(IDi)}_Bj'
+/\ Uj' := {H(SIDj)}_Bj'
+/\ Bii' := xor(Ui',xor(({H(PWi')}_Ai'),({H(Yi'.SIDj')}_Ai')))
+/\ Bjj' := xor(Uj',xor(({H(PWi')}_Ai'),({H(Yi'.SIDj')}_Ai')))
+/\ SND({Bii'.Bjj'}_Kus)
+/\ secret(Bii',g4,{U,S}) /\ secret(Bjj',g5,{U,S}) /\ secret(Xsj,g6,{S})
+
+% Mutual authentication phase
+2. State = 1 /\ RCV(xor(Bjj,({H(Yi)}_Ai)).({IDi.({Mi'}_Ui').Pi'}_Ki')) =|>
+State':= 2
+/\ Ki' := xor(Ri,({SIDj}_Bj))
+%/\ Use Ki' to decrypt Ci
+%/\ Use Ui to decrypt Bi and obtain Mi
+/\ Sj' := new()
+/\ Wj' := T(Sj'.Pi')
+/\ Kij' := H(T(Sj'.Mi'))
+/\ MacSj' := {H(SIDj.IDi.Mi')}_Kij'
+/\ SND(MacSj'.Wj')
+/\ witness(S,U,s_u_sj,Sj')
+/\ request(U,S,u_s_pi,Pi')
+3. State = 2 /\ RCV({H(IDi.SIDj.T(Sj'.Pi'))}_Kij') =|>
+State':= 3
+%/\ Confirm MacUi := {H(IDi.SIDj.T(Sj.Pi))}_Kij
+
+end role
+
+
+role session (U, S: agent, Kus: symmetric_key, T, H: hash_func) def=
+
+local SU, RU, SS, RS: channel (dy)
+
+composition
+
+user (U,S,Kus,T,H,SU,RU) /\ server (U,S,Kus,T,H,SS,RS)
+
+end role
+
+
+role environment() def=
+
+const u, s: agent,
+kus, kui: symmetric_key,
+t, h: hash_func,
+u_s_pi, s_u_sj, g1, g2, g3, g4, g5, g6: protocol_id
+
+intruder_knowledge = {u,s}
+
+composition
+
+session(u,s,kus,t,h)
+/\ session(i,s,kui,t,h)
+/\ session(u,i,kui,t,h)
+
+end role
+
+
+goal
+
+secrecy_of g1, g2, g3, g4, g5, g6 authentication_on u_s_pi, s_u_sj
+
+end goal
+
+
+environment()
