@@ -1,0 +1,78 @@
+role user (A, S, U: agent, Kau: symmetric_key, ECDSA: public_key, H, Add, Mul, Pair: hash_func, SND, RCV: channel (dy))
+played_by U def=
+local State: nat,
+IDi, TIDi, Ys, Alpha, SK, Ss, Ce, C, Hs, Sig, G, M, Y, X, IP, T: text
+init State := 0
+transition
+% User registration phase
+1.  State = 0 /\ RCV(start) =|>
+State':= 1
+/\ IDi' := new() /\ SND({IDi'}_Kau) /\ secret(IDi',idi,{A,U})
+2.  State = 1 /\ RCV({exp(G,Add(Alpha'.TIDi'))}_Kau) =|>
+State':= 2
+%/\ Store SK % Log verification phase
+3.  State = 0 /\ RCV(exp(G,Ss').Mul(M.exp(Y,Ss')).({X'.IP.T}_inv(ECDSA))) =|>
+State':= 1
+%/\ Use ECDSA to verify ECDSA signature %/\ Use Y and C = Mul(M.exp(Y,S)) to verify log signature
+/\ request(S,U,ss,Ss')
+% Log unsigncryption phase
+/\ Ys' := Pair(SK.exp(G,Ss'))
+%/\ Use Ys to decytp C and obtain view the log data M
+end role
+
+role authority (A, S, U: agent, Kau: symmetric_key, ECDSA: public_key, H, Add, Mul, Pair: hash_func, SND, RCV: channel (dy))
+played_by A def=
+local State: nat,
+IDi, TIDi, Ys, Alpha, SK, Ss, Ce, C, Hs, Sig, G, M, Y, X, IP, T: text
+init State := 0
+transition
+% User registration phase
+1. State = 0 /\ RCV({IDi'}_Kau) =|>
+State':= 1
+%/\ Verify IDi
+/\ Alpha' := new() /\ TIDi' := new() /\ SK' := exp(G,Add(Alpha'.TIDi'))
+%/\ The value SK' is computed for three attributes A, B, C
+/\ SND({SK'}_Kau)
+/\ secret(SK',sk,{U,A}) /\ secret(Alpha',alpha,{A})
+end role
+
+role sensor (A, S, U: agent, Kau: symmetric_key, ECDSA: public_key, H, Add, Mul, Pair: hash_func, SND, RCV: channel (dy))
+played_by S def=
+local State: nat,
+IDi, TIDi, Ys, Alpha, SK, Ss, Ce, C, Hs, Sig, G, M, Y, X, IP, T: text
+init State := 0
+transition
+% Log signcryption phase
+1. State = 0 /\ RCV(start) =|>
+State':= 1
+/\ Ss' := new() %/\ Choose Ss for computation of three attributes A, B, C; M is the log data
+/\ Ce' := exp(G,Ss') /\ C' := Mul(M.exp(Y,Ss')) /\ Hs' := H(C') /\ X' := exp(Hs',Mul(Y.Ss')) %/\ X: log signature
+/\ Sig' := {X'.IP.T}_inv(ECDSA) %/\ IP: IP adrress of the Sensor; T: timestamp
+/\ SND(Ce'.C'.Sig')
+/\ secret(Ss',ss,{S})
+/\ witness(S,U,ss,Ss')
+end role
+
+role session (A, S, U: agent, Kau: symmetric_key, ECDSA: public_key, H, Add, Mul, Pair: hash_func) def=
+local SA, RA, SS, RS, SU, RU: channel (dy)
+composition
+authority (A,S,U,Kau,ECDSA,H,Add,Mul,Pair,SA,RA) /\ sensor (A,S,U,Kau,ECDSA,H,Add,Mul,Pair,SS,RS)
+/\ user (A,S,U,Kau,ECDSA,H,Add,Mul,Pair,SU,RU)
+end role
+
+role environment() def=
+const a, s, u, i: agent,
+kau, kui: symmetric_key,
+ecdsa, ki: public_key,
+h, add, mul, pair: hash_func,
+idi, sk, alpha, ss: protocol_id
+intruder_knowledge = {a,s,u,ki,inv(ki)}
+composition
+session(a,s,u,kau,ecdsa,h,add,mul,pair) /\ session(i,s,u,kui,ecdsa,h,add,mul,pair)
+/\ session(a,i,u,kui,ecdsa,h,add,mul,pair) /\ session(a,s,i,kui,ecdsa,h,add,mul,pair)
+end role
+goal
+secrecy_of idi, sk, alpha, ss
+authentication_on ss
+end goal
+environment()
