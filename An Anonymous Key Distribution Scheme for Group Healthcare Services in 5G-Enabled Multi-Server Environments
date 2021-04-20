@@ -1,0 +1,80 @@
+role user (U, S: agent, Kus, SKij: symmetric_key, Ks: public_key, H, H4, H5, Sub, Add, Mul: hash_func, SND, RCV: channel (dy))
+played_by U def=
+local State: nat,
+IDi, IDinew, IDj, Nj, PWi, Bi, Ck0, E, Ej, Xj, V, N, N1, Hi, BBi, W, Yij, Tu, Ts, T1, T2, A, As, B, Bs, SKijNew: text, K, Q, C1, C2, C3: message
+init State := 0
+transition
+% Registration phase
+1.  State = 0 /\ RCV(start) =|>
+State':= 1
+%/\ Enter IDi, PWi & Bi
+/\ E' := new() /\ BBi' := H(PWi.Bi) /\ W' := H(H(PWi.E').xor(h(xor(IDi,IDj)),E'))
+/\ SND({IDi.W'.BBi'}_Kus)
+/\ secret(E',g1,{U}) /\ secret(IDi,g2,{U,S}) /\ secret(PWi,g3,{U}) /\ secret(Bi,g4,{U})
+2.  State = 1 /\ RCV({IDi.Nj.{H(Xj').IDj.IDi.H(H(PWi.E).xor(h(xor(IDi,IDj)),E)).H(PWi.Bi)}_Xj'}_Kus) =|>
+State':= 2
+/\ Ej' := xor(E,({H(Xj).IDj.IDi.W.BBi}_Xj))
+%/\ Store E, IDi, PWi & Bi in the smart card %/\ Store Ej', IDj, & Nj in the USB
+% Login and authentication phase
+3.  State = 0 /\ RCV(start) =|>
+State':= 1
+%/\ Insert smart card %/\ Enter PWi* & Bi*
+/\ V' := new()
+%/\ Suppose bij = 3
+/\ N' := H(H(H(V'))) /\ BBi' := H(PWi.Bi) /\ W' := H(H(PWi.E).xor(h(xor(IDi,IDj)),E)) /\ Yij' := xor(E,Ej) /\ Tu' := new() /\ A' := xor(xor(BBi',W'),Tu') /\ K' := {IDi.IDj.Yij'.N'.A'.Tu'}_Ks
+/\ SND(K')
+/\ witness(U,S,u_s_v,V') /\ witness(U,S,u_s_tu,Tu')
+/\ secret(IDi,g2,{U,S}) /\ secret(PWi,g3,{U}) /\ secret(Bi,g4,{U})
+4.  State = 1 /\ RCV(({xor(H(H(H(H(V')))),Ts').H(Yij.IDi.H(Xj)).Ts'}_SKij').C1'.C2'.C3') =|>
+State':= 2
+/\ SKij' := H(xor(N,Yij))
+%/\ Confirm Ts' %/\ Confirm B %/\ Store IDinew in the smart card
+/\ Hi' := H5(SKij'.Ts') /\ Ck0' := Sub(H4(SKij'.Ts').Add(Mul(Hi'.C1').Mul(Hi'.C2').Mul(Hi'.C3')))
+/\ request(S,U,s_u_ts,Ts')
+end role
+role server (U, S: agent, Kus, SKij: symmetric_key, Ks: public_key, H, H4, H5, Sub, Add, Mul: hash_func, SND, RCV: channel (dy))
+played_by S def=
+local State: nat,
+IDi, IDinew, IDj, Nj, PWi, Bi, Ck0, E, Ej, X, Y, Xj, V, N, N1, Hi, BBi, W, Yij, Tu, Ts, T1, T2, A, As, B, Bs, ATa, ATb, SKijNew: text, K, Q, C1, C2, C3: message
+init State := 0
+transition
+% Registration phase
+1. State = 0 /\ RCV({IDi.H(H(PWi.E').xor(h(xor(IDi,IDj)),E')).H(PWi.Bi)}_Kus) =|>
+State':= 1
+/\ Yij' := {H(Xj).IDj.IDi.H(H(PWi.E').xor(h(xor(IDi,IDj)),E')).H(PWi.Bi)}_Xj
+%/\ Store IDj
+/\ SND({IDi.Nj.Yij'}_Kus)
+/\ secret(Xj,g5,{S})
+% Login and authentication phase
+2. State = 0 /\ RCV({IDi.IDj.Yij'.H(H(H(V'))).A'.Tu'}_Ks) =|>
+State':= 1
+%/\ Confirm Tu' %/\ Use Xj to decrypt Yij %/\ Confirm H(Xj), IDsj & IDi
+/\ A' := xor(xor(BBi.W).Tu')
+%/\ Confirm A
+/\ Ts' := new() /\ B' := xor(H(H(H(H(V')))),Ts') /\ IDinew' := H(Yij.IDi.H(Xj)) /\ SKij' := H(xor(H(H(H(V'))),Yij)) /\ Hi' := H5(SKij'.Ts')
+%/\ Suppose there are three users in this communication sesstion. The server calculates ck0 and hide it into the following multiple equations, in which C1, C2 and C3 are predetermined, and Hj is equal to H4(skij||T2).
+/\ C1' := new() /\ C2' := new() /\ C3' := new() /\ Ck0' := Sub(H4(SKij'.Ts').Add(Mul(Hi'.C1').Mul(Hi'.C2').Mul(Hi'.C3'))) /\ Q':= {B'.IDinew'.Ts'}_SKij'
+/\ SND (Q'.C1'.C2'.C3')
+/\ witness(S,U,s_u_ts,Ts')
+/\ request(U,S,u_s_v,V') /\ request(U,S,u_s_tu,Tu')
+end role
+role session (U, S: agent, Kus, SKij: symmetric_key, Ks: public_key, H, H4, H5, Sub, Add, Mul: hash_func) def=
+local SU, RU, SS, RS: channel (dy)
+composition
+user (U,S,Kus,SKij,Ks,H,H4,H5,Sub,Add,Mul,SU,RU) /\ server (U,S,Kus,SKij,Ks,H,H4,H5,Sub,Add,Mul,SS,RS)
+end role
+role environment() def=
+const u, s: agent,
+kus, skij, kui: symmetric_key,
+ks, ki: public_key,
+h, h4, h5, sub, add, mul: hash_func,
+u_s_v, u_s_tu, s_u_ts, g1, g2, g3, g4, g5: protocol_id
+intruder_knowledge = {u,s,ks,ki,inv(ki)}
+composition
+session(u,s,kus,skij,ks,h,h4,h5,sub,add,mul) /\ session(u,i,kui,kui,ks,h,h4,h5,sub,add,mul) /\ session(i,s,kui,kui,ks,h,h4,h5,sub,add,mul)
+end role
+goal
+secrecy_of g1, g2, g3, g4, g5
+authentication_on u_s_v, u_s_tu, s_u_ts
+end goal
+environment()
