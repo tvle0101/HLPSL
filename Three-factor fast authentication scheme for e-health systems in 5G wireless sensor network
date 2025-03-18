@@ -1,3 +1,5 @@
+% Link: https://www.mdpi.com/1424-8220/20/9/2511
+
 role user (U, S: agent, Kus, SKij: symmetric_key, Ks: public_key, H, H1, H2, H6, H7, H14, H16: hash_func, SND, RCV: channel (dy))
 played_by U def=
 
