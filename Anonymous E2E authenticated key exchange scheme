@@ -1,3 +1,5 @@
+% Link: https://ieeexplore.ieee.org/document/9016184/
+
 role user (U, S, F: agent, Kus, Rus, Kas: symmetric_key, Ks: public_key, H, Mul: hash_func, SND, RCV: channel (dy))
 played_by U def=
 
