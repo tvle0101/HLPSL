@@ -1,5 +1,3 @@
-% Link: https://ieeexplore.ieee.org/document/9245470/
-
 role user (U, TMIS: agent, SecureChannel: symmetric_key, Rabin: public_key, H: hash_func, SND, RCV: channel (dy))
 played_by U def=
 
