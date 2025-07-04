@@ -1,5 +1,3 @@
-% Link: https://ieeexplore.ieee.org/document/9393890
-
 role user (U, S: agent, Kus, SKij: symmetric_key, Ks: public_key, H, H4, H5, Sub, Add, Mul: hash_func, SND, RCV: channel (dy))
 played_by U def=
 local State: nat,
